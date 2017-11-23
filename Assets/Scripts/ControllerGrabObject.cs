@@ -27,26 +27,28 @@ public class ControllerGrabObject : MonoBehaviour {
     // Update is called once per frame
     void Update()
     {
-        if (Controller.GetHairTriggerDown())
+        if (Controller.GetHairTrigger())
         {
             holding = true;
-            Debug.Log(collidingObject);
+            //Debug.Log(collidingObject);
+           // Debug.Log("Update");
             if (collidingObject)
             {
+                // Debug.Log("COLLIDING WOOOO");
                 int index;
                 NearestVertexTo(transform.position, out index, out nearestVertex);
-                Debug.Log("Index: " + index);
-                Debug.Log("NearestVertex: " + nearestVertex);
+               Debug.Log("Index: " + index);
+               Debug.Log("NearestVertex: " + nearestVertex);
 
                 if (lastPosition == Vector3.zero)
                 {
                     lastPosition = nearestVertex;
                 }
 
-                Vector3 newPosition = transform.position;
-                Debug.Log("New Position: " + newPosition);
+                Vector3 newPosition = transform.localPosition;
+               // Debug.Log("New Position: " + newPosition);
                 Vector3 between = newPosition - lastPosition;
-                Debug.Log("Between: " + between);
+               // Debug.Log("Between: " + between);
                 MeshDeformation deformationScript = collidingObject.GetComponent<MeshDeformation>();
                 deformationScript.Deform(nearestVertex, index, between, newPosition); // vertex to change, index of vertex to change, vector representing distance and direction, new vertex
                 lastPosition = newPosition;
@@ -66,15 +68,6 @@ public class ControllerGrabObject : MonoBehaviour {
         {
             SetCollidingObject(other);
         }
-	}
-		
-	public void OnTriggerStay(Collider other)
-	{
-        if (holding == false)
-        {
-            SetCollidingObject(other);
-        }
-		
 	}
 		
 	public void OnTriggerExit(Collider other)
