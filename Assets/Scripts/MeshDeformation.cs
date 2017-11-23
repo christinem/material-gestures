@@ -31,8 +31,6 @@ public class MeshDeformation : MonoBehaviour {
 		}
 		mesh.vertices = vertices;
 		mesh.RecalculateBounds();
-		meshVertices = vertices;
-
 	}
 
 	private Vector3[] getNewVertices(Vector3 oldVertex, int index, Vector3 between, Vector3 newVertex) {
