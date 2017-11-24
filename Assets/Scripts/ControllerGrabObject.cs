@@ -29,6 +29,7 @@ public class ControllerGrabObject : MonoBehaviour {
     {
         if (Controller.GetHairTrigger())
         {
+            // Each controller has it's nearest vertex
             holding = true;
             //Debug.Log(collidingObject);
            // Debug.Log("Update");
@@ -37,8 +38,8 @@ public class ControllerGrabObject : MonoBehaviour {
                 // Debug.Log("COLLIDING WOOOO");
                 int index;
                 NearestVertexTo(transform.position, out index, out nearestVertex);
-               Debug.Log("Index: " + index);
-               Debug.Log("NearestVertex: " + nearestVertex);
+                Debug.Log("Index: " + index);
+                Debug.Log("NearestVertex: " + nearestVertex);
 
                 if (lastPosition == Vector3.zero)
                 {
@@ -46,10 +47,11 @@ public class ControllerGrabObject : MonoBehaviour {
                 }
 
                 Vector3 newPosition = transform.localPosition;
-               // Debug.Log("New Position: " + newPosition);
+                // Debug.Log("New Position: " + newPosition);
                 Vector3 between = newPosition - lastPosition;
-               // Debug.Log("Between: " + between);
+                // Debug.Log("Between: " + between);
                 MeshDeformation deformationScript = collidingObject.GetComponent<MeshDeformation>();
+                // THIS DOES THE DEFORMATION
                 deformationScript.Deform(nearestVertex, index, between, newPosition); // vertex to change, index of vertex to change, vector representing distance and direction, new vertex
                 lastPosition = newPosition;
             }

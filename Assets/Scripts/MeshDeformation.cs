@@ -17,7 +17,7 @@ public class MeshDeformation : MonoBehaviour {
 	
 	// Update is called once per frame
 	void Update () {
-
+        // play/pause, reset keyboard listeners
 	}
 
 	public void Deform(Vector3 oldVertex, int index, Vector3 between, Vector3 newVertex) {
@@ -43,8 +43,11 @@ public class MeshDeformation : MonoBehaviour {
 		Vector3[] newVertices = new Vector3[originalVertices.Length];
 
 		for (int i = 0; i < originalVertices.Length; i++) {
-			newVertices[i] = originalVertices[i] + between;
+            newVertices[i] = originalVertices[i] + between;
+            // newVertices[i] = originalVertices[i];
 		}
+
+        // newVertices[index] = newVertex;
 
 		return newVertices;
 	}
