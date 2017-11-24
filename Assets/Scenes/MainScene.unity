@@ -38,7 +38,7 @@ RenderSettings:
   m_ReflectionIntensity: 1
   m_CustomReflection: {fileID: 0}
   m_Sun: {fileID: 0}
-  m_IndirectSpecularColor: {r: 0.18028378, g: 0.22571412, b: 0.30692285, a: 1}
+  m_IndirectSpecularColor: {r: 0.18028355, g: 0.22571374, b: 0.30692255, a: 1}
 --- !u!157 &3
 LightmapSettings:
   m_ObjectHideFlags: 0
@@ -263,7 +263,7 @@ Transform:
   m_Father: {fileID: 0}
   m_RootOrder: 3
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!21 &1346373646
+--- !u!21 &843335531
 Material:
   serializedVersion: 6
   m_ObjectHideFlags: 0
@@ -338,11 +338,11 @@ Prefab:
     - target: {fileID: 3380982, guid: 4d293c8e162f3874b982baadd71153d2, type: 2}
       propertyPath: m_Mesh
       value: 
-      objectReference: {fileID: 1483393448}
+      objectReference: {fileID: 1470419703}
     - target: {fileID: 2348914, guid: 4d293c8e162f3874b982baadd71153d2, type: 2}
       propertyPath: m_Materials.Array.data[0]
       value: 
-      objectReference: {fileID: 1346373646}
+      objectReference: {fileID: 843335531}
     m_RemovedComponents:
     - {fileID: 11420968, guid: 4d293c8e162f3874b982baadd71153d2, type: 2}
   m_ParentPrefab: {fileID: 100100000, guid: 4d293c8e162f3874b982baadd71153d2, type: 2}
@@ -382,6 +382,17 @@ Rigidbody:
   m_Interpolate: 0
   m_Constraints: 0
   m_CollisionDetection: 0
+--- !u!114 &1390324476
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_PrefabParentObject: {fileID: 0}
+  m_PrefabInternal: {fileID: 0}
+  m_GameObject: {fileID: 1390324473}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bb2c3611ae7d74a6091b8df06275bedb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!65 &1390324477
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -414,24 +425,13 @@ MonoBehaviour:
   m_ObjectHideFlags: 0
   m_PrefabParentObject: {fileID: 0}
   m_PrefabInternal: {fileID: 0}
-  m_GameObject: {fileID: 1390324473}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 65114866e613d4bea868d2cf558d5f51, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
---- !u!114 &1390324481
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_PrefabParentObject: {fileID: 0}
-  m_PrefabInternal: {fileID: 0}
   m_GameObject: {fileID: 1390324472}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 65114866e613d4bea868d2cf558d5f51, type: 3}
+  m_Script: {fileID: 11500000, guid: bb2c3611ae7d74a6091b8df06275bedb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
---- !u!43 &1483393448
+--- !u!43 &1470419703
 Mesh:
   m_ObjectHideFlags: 0
   m_PrefabParentObject: {fileID: 0}
@@ -592,6 +592,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5245e548f68f84d55af059ff7f477ac6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  controllerOne: {fileID: 1390324472}
+  controllerTwo: {fileID: 1390324473}
 --- !u!64 &1732908766
 MeshCollider:
   m_ObjectHideFlags: 0
