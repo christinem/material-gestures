@@ -27,7 +27,16 @@ public class ControllerScript : MonoBehaviour {
 
 	void Update() {
 		controllerPosition = transform.position;
-	}
+        if (Controller.GetHairTriggerDown())
+        {
+            holding = true;
+        } 
+
+        if (Controller.GetHairTriggerUp())
+        {
+            holding = false;
+        }
+    }
 
 	/* -------- Trigger Functions -------- */
 		

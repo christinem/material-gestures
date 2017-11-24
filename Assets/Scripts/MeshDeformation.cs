@@ -73,7 +73,8 @@ public class MeshDeformation : MonoBehaviour {
 		Vector3[] newVertices = new Vector3[originalVertices.Length];
 
 		for (int i = 0; i < originalVertices.Length; i++) {
-//            newVertices[i] = originalVertices[i] + between;
+            Vector3 between = controllerPos - controllerNearest;
+            newVertices[i] = originalVertices[i] + between;
 		}
 
 		return newVertices;
