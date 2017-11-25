@@ -9,9 +9,12 @@ public class MeshDeformation : MonoBehaviour {
 	public GameObject controllerOne;
 	public GameObject controllerTwo;
 
+    bool controllerOneCloseEnough = false;
+    bool controllerTwoCloseEnough = false;
 
-	// Use this for initialization
-	void Start () {
+
+    // Use this for initialization
+    void Start () {
 		mesh = ((MeshFilter)gameObject.GetComponent("MeshFilter")).mesh;
 		meshVertices = mesh.vertices;
 
@@ -25,35 +28,33 @@ public class MeshDeformation : MonoBehaviour {
 		SteamVR_Controller.Device controlOne = controlOneScript.Controller;
 		SteamVR_Controller.Device controlTwo = controlTwoScript.Controller;
 
+        Vector3 controllerOnePos = controllerOne.transform.position;
+        int controllerOneIndex = 0;
+        Vector3 controllerOneNearest = Vector3.zero;
+
+        Vector3 controllerTwoPos = controllerTwo.transform.position;
+        int controllerTwoIndex = 0;
+        Vector3 controllerTwoNearest = Vector3.zero;
+
         Vector3[] newVertices = mesh.vertices;
 
-        // if pressing controller one button and controller one is colliding with this object
-        Debug.Log(gameObject);
-        // Only change vertex on trigger down
-        // Has to work with two or more objects
-		if (controlOne.GetHairTrigger() /*&& controlOneScript.collidingObject == gameObject*/) {
-            // get controller one position and nearest index and do the deformation 
-			Vector3 controllerOnePos = controllerOne.transform.position;
-			int controllerOneIndex;
-			Vector3 controllerOneNearest;
-
-			NearestVertexTo (controllerOnePos, out controllerOneIndex, out controllerOneNearest);
-			newVertices = getNewVertices (controllerOnePos, controllerOneIndex, controllerOneNearest);
-            ReRender(newVertices);
+		if (controlOne.GetHairTriggerDown()) {
+      		NearestVertexTo (controllerOnePos, out controllerOneIndex, out controllerOneCloseEnough, out controllerOneNearest);
         }
 
-		// if pressing controller two button and controller one is colliding with this object
-		if (controlTwo.GetHairTrigger() /*&& controlTwoScript.collidingObject == gameObject*/) {
-            // get controller two position and nearest index and do the deformation 
-            Vector3 controllerTwoPos = controllerTwo.transform.position;
-			int controllerTwoIndex;
-			Vector3 controllerTwoNearest;
-
-			NearestVertexTo (controllerTwoPos, out controllerTwoIndex, out controllerTwoNearest);
-			newVertices = getNewVertices (controllerTwoPos, controllerTwoIndex, controllerTwoNearest);
-            ReRender(newVertices);
+		if (controlTwo.GetHairTriggerDown()) {
+			NearestVertexTo (controllerTwoPos, out controllerTwoIndex, out controllerTwoCloseEnough, out controllerTwoNearest);
 		}
-	}
+
+       if (controlOne.GetHairTrigger() || controlTwo.GetHairTrigger())
+       //if (controllerOneCloseEnough || controllerTwoCloseEnough)
+        {
+            newVertices = getNewVertices(controllerOnePos, controllerOneNearest, controllerOneIndex, controllerOneCloseEnough,
+                                         controllerTwoPos, controllerTwoNearest, controllerTwoIndex, controllerTwoCloseEnough);
+            ReRender(newVertices);
+        }
+        
+    }
 
     private void ReRender(Vector3[] newVertices)
     {
@@ -72,24 +73,40 @@ public class MeshDeformation : MonoBehaviour {
         meshVertices = vertices;
     }
 		
-	private Vector3[] getNewVertices(Vector3 controllerPos, int controllerPosIndex, Vector3 controllerNearest) {
+	private Vector3[] getNewVertices(Vector3 controllerOnePos, Vector3 controllerOneNearest, int controllerOneNearestIndex, 
+        bool controllerOneTriggered, Vector3 controllerTwoPos, Vector3 controllerTwoNearest, int controllerTwoNearestIndex, 
+        bool controllerTwoTriggered) {
 		
 		Vector3[] originalVertices = meshVertices; // original vertices of this mesh
 
-		// Get and return the new vertices
+        // Get and return the new vertices
 
-		// Temporary testing code
-		Vector3[] newVertices = new Vector3[originalVertices.Length];
+        // Temporary testing code
+        Vector3[] newVertices = meshVertices;
 
-		for (int i = 0; i < originalVertices.Length; i++) {
-            Vector3 between = controllerPos - controllerNearest;
-            newVertices[i] = originalVertices[i] + between;
-		}
+        if (controllerOneTriggered) {
+            Debug.Log("Controller 1");
+            for (int i = 0; i < originalVertices.Length; i++)
+            {
+                Vector3 between = controllerOnePos - controllerOneNearest;
+                newVertices[i] = originalVertices[i] + between;
+            }
+        }
 
-		return newVertices;
+        if (controllerTwoTriggered)
+        {
+            Debug.Log("Controller 2");
+            for (int i = 0; i < originalVertices.Length; i++)
+            {
+                Vector3 between = controllerTwoPos - controllerTwoNearest;
+                newVertices[i] = originalVertices[i] + between;
+            }
+        }
+
+        return newVertices;
 	}
 
-	public void NearestVertexTo(Vector3 point, out int index, out Vector3 nearest)
+	public void NearestVertexTo(Vector3 point, out int index, out bool isCloseEnough, out Vector3 nearest)
 	{
 
 		// Debug.Log("Getting Nearest Vertex");
@@ -115,6 +132,14 @@ public class MeshDeformation : MonoBehaviour {
 				index = i;
 			}
 		}
+
+        if (minDistanceSqr < 3)
+        {
+            isCloseEnough = true;
+        } else
+        {
+            isCloseEnough = false;
+        }
         // convert nearest vertex back to world space
         nearest = transform.TransformPoint(nearestVertex);
 	}
