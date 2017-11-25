@@ -10,7 +10,7 @@ public class ControllerScript : MonoBehaviour {
 	public GameObject collidingObject; 
 //	private Vector3 lastPosition; // the controller's last position
 //	private Vector3 nearestVertex;
-	private bool holding;
+	public bool holding;
 	Vector3 controllerPosition;
 
 
@@ -40,35 +40,35 @@ public class ControllerScript : MonoBehaviour {
 
 	/* -------- Trigger Functions -------- */
 		
-	public void OnTriggerEnter(Collider other)
-	{
-        if (holding == false)
-        {
-            SetCollidingObject(other);
-        }
-	}
+	//public void OnTriggerEnter(Collider other)
+	//{
+ //       if (holding == false)
+ //       {
+ //           SetCollidingObject(other);
+ //       }
+	//}
 		
-	public void OnTriggerExit(Collider other)
-	{
-		if (!collidingObject)
-		{
-			return;
-		}
+	//public void OnTriggerExit(Collider other)
+	//{
+	//	if (!collidingObject)
+	//	{
+	//		return;
+	//	}
 
-        if (holding == false)
-        {
-            collidingObject = null;
-        }
-	}
+ //       if (holding == false)
+ //       {
+ //           collidingObject = null;
+ //       }
+	//}
 
-	/* -------- Helpers --------- */
+	///* -------- Helpers --------- */
 
-	private void SetCollidingObject(Collider col)
-	{
-        if (collidingObject || !col.GetComponent<Rigidbody>())
-		{
-			return;
-		}
-		collidingObject = col.gameObject; 
-	}
+	//private void SetCollidingObject(Collider col)
+	//{
+ //       if (collidingObject || !col.GetComponent<Rigidbody>())
+	//	{
+	//		return;
+	//	}
+	//	collidingObject = col.gameObject; 
+	//}
 }
