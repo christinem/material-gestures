@@ -16,7 +16,16 @@ public class ControllerScript : MonoBehaviour {
 
 	public SteamVR_Controller.Device Controller
 	{
-		get { return SteamVR_Controller.Input((int)trackedObj.index); }
+		get {
+            try
+            {
+            return SteamVR_Controller.Input((int)trackedObj.index);
+            }
+            catch (System.NullReferenceException ex)
+            {
+                return null;
+            }
+        }
 	}
 
 	void Awake()
