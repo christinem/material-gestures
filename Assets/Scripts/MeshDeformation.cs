@@ -6,10 +6,11 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using UnityEngine;
 
+
 public class MeshDeformation : MonoBehaviour {
     // DLL Imports
     [DllImport("C:\\Users\\cmurad\\Documents\\GAUSS\\build\\x64\\Release\\GAUSSDLL.dll")]
-    public static extern IntPtr CreateMyObjectInstance(int i);
+    public static extern IntPtr CreateMyObjectInstance(double grabbing_spring_stiffness, double spring_root_mass, double density, double youngsModulus, double poissonsRatio, double timestep, string mesh_path);
     [DllImport("C:\\Users\\cmurad\\Documents\\GAUSS\\build\\x64\\Release\\GAUSSDLL.dll")]
     public static extern int increment(IntPtr gaussObject, bool grabbed, int index, double x, double y, double z);
     [DllImport("C:\\Users\\cmurad\\Documents\\GAUSS\\build\\x64\\Release\\GAUSSDLL.dll")]
@@ -17,16 +18,25 @@ public class MeshDeformation : MonoBehaviour {
     [DllImport("C:\\Users\\cmurad\\Documents\\GAUSS\\build\\x64\\Release\\GAUSSDLL.dll")]
     public static extern void get_updated_mesh(IntPtr gaussObject, double[] verts_flat, int[] face_indices_flat);
 
+    //Instances of all MeshDeformations. Used for logging purposes
+    public static List<MeshDeformation> instances = new List<MeshDeformation>();
 
     // My Parameters
     double minSelectionDist = 0.15; // Chosen through experiment
+    double grabbing_spring_stiffness = 200.0;
+    double spring_root_mass = 100000000.0;
+    double timestep = 0.05;
+    double density = 1000.0;
+    double youngsModulus = 1000000.0;
+    double poissonsRatio = 0.35;
+     
 
     // Script parameters (set by Unity)
     public GameObject controllerOne;
-    public GameObject controllerTwo;
+    //public GameObject controllerTwo;
 
     // Controller state to simplify controller handling
-    private struct ControllerState
+    public struct ControllerState
     {
         public int id; // Integer id to identify the controller
         public bool isGrabbing; // Is the trigger currently depressed and was it close enough to a vert when it was pulled? 
@@ -38,47 +48,53 @@ public class MeshDeformation : MonoBehaviour {
         public SteamVR_Controller.Device device;
     }
 
-    private ControllerState[] controllerStates;
+    public ControllerState[] controllerStates;
 
     public Mesh mesh;
 
+    public static bool experiment_running = false;
+
     bool meshThreadRunning;
-    bool meshThreadFinished;
+    public bool meshThreadFinished;
+    public bool reset_object_pending;
+    public long reset_timestamp = 0;
     Thread meshThread;
     Vector3[] threadMeshVertices;
     IntPtr gaussObject;
     double[] verts_flat;
     int[] face_indices_flat;
 
+    public string mesh_file_location = "";//passed into readMesh to read in the correct file for this instance
+
+    
     void meshThreadWork()
     {
         while(!meshThreadFinished)
         {
             if(meshThreadRunning)
             {
-                for(int i = 0; i < 2; i++)
-                {
-                    
-                }
+                // Currently only have interaction for first controller implemented
+                ControllerState state = controllerStates[0];
+                Vector3 localControllerPos = state.pos; // This is the controller position in object space (transformed into gauss coordinate frame)
 
-                ControllerState state = controllerStates[1];
-                Vector3 localControllerPos = state.pos;
+                // This call does the actual simulation timestep
                 increment(gaussObject, state.isGrabbing, state.grabbedVertIndex, (double)localControllerPos.x, (double)localControllerPos.y, (double)localControllerPos.z);
-                get_updated_mesh(gaussObject, verts_flat, face_indices_flat);
 
-                //Now update the mesh with the new one
+                // Now update the mesh with the new one
+                get_updated_mesh(gaussObject, verts_flat, face_indices_flat);
                 for (int i = 0; i < threadMeshVertices.Length; i++)
                 {
                     threadMeshVertices[i] = new Vector3((float)verts_flat[i * 3], (float)verts_flat[i * 3 + 1], (float)verts_flat[i * 3 + 2]);
                 }
 
                 meshThreadRunning = false;
-                //Thread.Sleep(Timeout.Infinite);
                 meshThread.Suspend();
             }
         }
     }
-    void OnDisable()
+
+    //Separated it out into its own function
+    void KillThread()
     {
         // If the thread is still running, we should shut it down,
         // otherwise it can prevent the game from exiting correctly.
@@ -95,29 +111,97 @@ public class MeshDeformation : MonoBehaviour {
 
         // Thread is guaranteed no longer running. Do other cleanup tasks.
     }
+    
+    // Gets called when you quit unity. Need to kill the simulation thread or else it hangs
+    void OnDisable()
+    {
+        KillThread();
+    }
 
-    // Use this for initialization
-    void Start () {
-        // Get the mesh this script has been assigned to.
-        mesh = ((MeshFilter)gameObject.GetComponent("MeshFilter")).mesh;
+    //Added this to reset the object when user has clicked the menu button.
+    public void ObjectReset() {
+        //KillThread(); //Separated
 
-
-
-        gaussObject = CreateMyObjectInstance(0);
+        //----------------------
+        //Straight copy pasted from start() function.
+        //without recreating any global variables.
+        Debug.Log("Loading " + mesh_file_location);
+        gaussObject = CreateMyObjectInstance(grabbing_spring_stiffness, spring_root_mass, density, youngsModulus, poissonsRatio, timestep, mesh_file_location);
         int n_face_indices = 0;
         int flat_verts_len = 0;
         get_mesh_sizes(gaussObject, ref n_face_indices, ref flat_verts_len);
         verts_flat = new double[flat_verts_len];
         face_indices_flat = new int[n_face_indices];
         get_updated_mesh(gaussObject, verts_flat, face_indices_flat);
+        //Now update the unity mesh with the new one from gauss
+        Vector3[] newVerts = new Vector3[flat_verts_len / 3];
+        for (int i = 0; i < newVerts.Length; i++)
+        {
+            newVerts[i] = new Vector3((float)verts_flat[i * 3], (float)verts_flat[i * 3 + 1], (float)verts_flat[i * 3 + 2]);
+        }
+        // Need to change order of indices for triangle normals to be computed correctly
+        for (int i = 0; i < face_indices_flat.Length / 3; i++)
+        {
+            int i0 = face_indices_flat[i * 3];
+            int i2 = face_indices_flat[i * 3 + 2];
+            face_indices_flat[i * 3] = i2;
+            face_indices_flat[i * 3 + 2] = i0;
+        }
+        mesh.SetTriangles(new int[0], 0);
+        mesh.vertices = newVerts;
+        mesh.SetTriangles(face_indices_flat, 0);
+        //mesh.vertices = new Vector3[0];
 
-        //Now update the mesh with the new one
+        
+        mesh.RecalculateBounds();
+        mesh.RecalculateNormals();
+        // Set up the simulation thread
+        threadMeshVertices = mesh.vertices;
+        // meshThreadFinished = false;
+        //meshThreadRunning = false;
+        //meshThread = new Thread(meshThreadWork);
+        //meshThread.Start();
+
+        // Put the Unity controllers into an array to simplify the rest of the logic
+        // TODO put this into a proper class constructor
+        controllerStates[0].gameObject = controllerOne;
+        controllerStates[0].id = 0;
+        controllerStates[0].isGrabbing = false;
+        controllerStates[0].grabbedVertIndex = -1;
+        //controllerStates[1].gameObject = controllerTwo;
+        //controllerStates[1].id = 1;
+        //controllerStates[1].isGrabbing = false;
+        //controllerStates[1].grabbedVertIndex = -1;
+        //----------------------
+    }
+    // Use this for initialization
+    public void myStart () {
+        
+        // Get the mesh this script has been assigned to. Assigning to mesh.vertices triggers a mesh update
+        mesh = ((MeshFilter)gameObject.GetComponent("MeshFilter")).mesh;
+
+
+        // Set up the simulation
+        // This is where you set the path to the bar
+        Debug.Log("Loading " + mesh_file_location);
+        gaussObject = CreateMyObjectInstance(grabbing_spring_stiffness, spring_root_mass, density, youngsModulus, poissonsRatio, timestep, mesh_file_location); 
+
+        int n_face_indices = 0;
+        int flat_verts_len = 0;
+        get_mesh_sizes(gaussObject, ref n_face_indices, ref flat_verts_len);
+
+        verts_flat = new double[flat_verts_len];
+        face_indices_flat = new int[n_face_indices];
+        get_updated_mesh(gaussObject, verts_flat, face_indices_flat);
+
+        //Now update the unity mesh with the new one from gauss
         Vector3[] newVerts = new Vector3[flat_verts_len / 3];
         for(int i = 0; i < newVerts.Length; i++)
         {
             newVerts[i] = new Vector3((float)verts_flat[i * 3], (float)verts_flat[i * 3 + 1], (float)verts_flat[i * 3 + 2]);
         }
 
+        // Need to change order of indices for triangle normals to be computed correctly
         for (int i = 0; i < face_indices_flat.Length/3; i++)
         {
             int i0 = face_indices_flat[i * 3];
@@ -125,19 +209,18 @@ public class MeshDeformation : MonoBehaviour {
             face_indices_flat[i * 3] = i2;
             face_indices_flat[i * 3 + 2] = i0;
         }
-
-
-        mesh.SetTriangles(face_indices_flat, 0);
-        mesh.RecalculateNormals();
-        
-        //mesh.SetIndices(face_indices_flat, MeshTopology.Triangles, 0);
+        mesh.SetTriangles(new int [0], 0);
         mesh.vertices = newVerts;
-        
+        mesh.SetTriangles(face_indices_flat, 0);
+             
         mesh.RecalculateBounds();
-        threadMeshVertices = mesh.vertices;
+        mesh.RecalculateNormals();
 
+        // Set up the simulation thread
+        threadMeshVertices = mesh.vertices;
         meshThreadFinished = false;
         meshThreadRunning = false;
+        reset_object_pending = false;
         meshThread = new Thread(meshThreadWork);
         meshThread.Start();
         
@@ -149,15 +232,19 @@ public class MeshDeformation : MonoBehaviour {
         controllerStates[0].id = 0;
         controllerStates[0].isGrabbing = false;
         controllerStates[0].grabbedVertIndex = -1;
-        controllerStates[1].gameObject = controllerTwo;
-        controllerStates[1].id = 1;
-        controllerStates[1].isGrabbing = false;
-        controllerStates[1].grabbedVertIndex = -1;
+        //controllerStates[1].gameObject = controllerTwo;
+        //controllerStates[1].id = 1;
+        //controllerStates[1].isGrabbing = false;
+        //controllerStates[1].grabbedVertIndex = -1;
+
+        instances.Add(this);
     }
 
+
+    // Updates the state of each controller
     void updateControllers()
     {
-        for(int i = 0; i < controllerStates.Length; i++)
+        for(int i = 0; i < 1; i++)
         {
             ControllerScript script = controllerStates[i].gameObject.GetComponent<ControllerScript>();
             SteamVR_Controller.Device device = script.Controller;
@@ -174,14 +261,12 @@ public class MeshDeformation : MonoBehaviour {
             // This is good though because that's actually what we want.
             if (device.GetHairTriggerDown())
             {
-                Debug.Log(mesh.vertices.Length);
                 int nearestVertIndex = nearestVertexTo(pos);
                 Vector3 nearestVertPos = transform.TransformPoint(mesh.vertices[nearestVertIndex]);
                 double dist = (pos - nearestVertPos).magnitude;
 
                 if(dist < minSelectionDist)
                 {
-                    Debug.Log("Grabbed vert " + nearestVertIndex);
                     isGrabbing = true;
                     grabbedVertIndex = nearestVertIndex;
                 }
@@ -192,80 +277,62 @@ public class MeshDeformation : MonoBehaviour {
                 isGrabbing = false;
             }
 
+
             controllerStates[i].isGrabbing = isGrabbing;
             controllerStates[i].pos = transform.InverseTransformPoint(pos);
             controllerStates[i].grabbedVertIndex = grabbedVertIndex;
             controllerStates[i].script = script;
             controllerStates[i].device = device;
+
+            
         }
+      
     }
 
-	// Update is called once per frame
-	void Update () {
-        // updateControllers();
-        //updateVertices(controllerStates);
-
-        if(!meshThreadRunning)
+    // Update is called once per frame
+    void Update() {
+        if (experiment_running)
         {
-            mesh.vertices = threadMeshVertices; // This is necessary to trigger an update for some reason >_<
-            mesh.RecalculateBounds(); // Todo Necessary?
-            mesh.RecalculateNormals();
-
             updateControllers();
-            // start a new mesh update call
-            meshThreadRunning = true;
-            meshThread.Resume();
-        } else if (meshThreadRunning)
-        {
-            // pass
-        }
-
-    }
-
-    private void updateVertices(ControllerState[] controllerStates)
-    {
-        // Now using threads
-        // We need to know whether the user is 'grabbing', which vertex the user is grabbing, and where the user's controller is located.
-        //Vector3[] originalVertices = meshVertices; // original vertices of this mesh
-
-      /*  Vector3[] origVerts = mesh.vertices;
-        Vector3 offset = new Vector3(0.0f,0.01f,0.0f);
-       // Debug.Log("Mesh has " + mesh.vertices.Length + "verts: i = " + increment(1));
-
-        if(mesh.vertices.Length == 515)
-        {
-            Thread.Sleep(500);
-        }
-        for (int i = 0; i < mesh.vertices.Length; i++)
-        {
-            origVerts[i] += offset;
-        }
-
-        mesh.vertices = origVerts; // This is necessary to trigger an update for some reason >_<
-        mesh.RecalculateBounds(); // Todo Necessary?
-        return; // Just stop after first controller*/
-        /*
-        foreach (ControllerState state in controllerStates)
-        {
-            if (state.isGrabbing)
+            // We need to wait for a simulation timestep to finish before updating the mesh
+            if (!meshThreadRunning)
             {
-                Vector3[] origVerts = mesh.vertices;
-
-                Vector3 meshPoint = transform.TransformPoint(mesh.vertices[state.grabbedVertIndex]);
-                Vector3 offset = state.pos - meshPoint;
- 
-                for (int i = 0; i < mesh.vertices.Length; i++)
+                if (reset_object_pending)
                 {
-                    origVerts[i] += offset;
+                    long now = DateTime.Now.Ticks / TimeSpan.TicksPerMillisecond;
+                    if (now - reset_timestamp > 500L)
+                    {
+                        ObjectReset();
+                        reset_object_pending = false;
+                    }
+                    else
+                    {
+                        return;
+                    }
+                }
+                else
+                {
+                 
+                    if (float.IsNaN(threadMeshVertices[0].x))
+                    {
+                        reset_object_pending = true;
+                        return;
+                    }
+
+                    mesh.vertices = threadMeshVertices; // This assignment triggers the update. It's not a normal variable.
+                    mesh.RecalculateBounds();
+                    mesh.RecalculateNormals();
+
                 }
 
-                mesh.vertices = origVerts; // This is necessary to trigger an update for some reason >_<
-                mesh.RecalculateBounds(); // Todo Necessary?
-                return; // Just stop after first controller
+                // start a new mesh update call
+                meshThreadRunning = true;
+                meshThread.Resume();
             }
-        }*/
-    }
+        }
 
+    }
+ 
 	public int nearestVertexTo(Vector3 point)
 	{
         // Returns the index of the closest vert to point.
@@ -281,6 +348,11 @@ public class MeshDeformation : MonoBehaviour {
 		{
 			Vector3 diff = localPoint - mesh.vertices[i];
 			float distSqr = diff.sqrMagnitude;
+            //if (distSqr > 5) //Easrly stopping
+            //{
+            //    return i; // Will always be too far away to grab
+            //}
+
 			if (distSqr < minDistanceSqr)
 			{
 				minDistanceSqr = distSqr;
@@ -290,6 +362,7 @@ public class MeshDeformation : MonoBehaviour {
 
         return nearestVertIndex;
 	}
+
 
 }
 
