@@ -21,11 +21,29 @@ public class ControllerScript : MonoBehaviour {
 
     //list of .mesh files to read
     // Listed from most coarse to most fine
-    static string[] beams = new string[] {  "C:\\Users\\cmurad\\Documents\\GAUSS\\data\\meshesTetgen\\Beam\\final_beams\\0_coarsest_beam.mesh" ,
-                                            "C:\\Users\\cmurad\\Documents\\GAUSS\\data\\meshesTetgen\\Beam\\final_beams\\1_coarse_beam.mesh",
-                                            "C:\\Users\\cmurad\\Documents\\GAUSS\\data\\meshesTetgen\\Beam\\final_beams\\2_medium_beam.mesh",
-                                            "C:\\Users\\cmurad\\Documents\\GAUSS\\data\\meshesTetgen\\Beam\\final_beams\\3_fine_beam.mesh",
-                                            "C:\\Users\\cmurad\\Documents\\GAUSS\\data\\meshesTetgen\\Beam\\final_beams\\4_finest_beam.mesh"};
+    static string[] beams = new string[] {  "C:\\Users\\cmurad\\Documents\\final_beams\\0_.mesh",
+                                            "C:\\Users\\cmurad\\Documents\\final_beams\\1_.mesh",
+                                            "C:\\Users\\cmurad\\Documents\\final_beams\\2_.mesh",
+                                            "C:\\Users\\cmurad\\Documents\\final_beams\\3_.mesh",
+                                            "C:\\Users\\cmurad\\Documents\\final_beams\\4_.mesh",
+                                            "C:\\Users\\cmurad\\Documents\\final_beams\\0_.mesh", // Last two are duplicates with added delay
+                                            "C:\\Users\\cmurad\\Documents\\final_beams\\1_.mesh",
+                                            };
+    static int[] ms_delays = new int[] { 0,
+                                        0,
+                                        0,
+                                        0,
+                                        0,
+                                        100,
+                                        100,};
+
+    static double[] YM_factors = new double[] { 0.5,
+                                        0.6,
+                                        0.7,
+                                        0.8,
+                                        0.9,
+                                        0.5, // same as first two
+                                        0.6,};
 
     int[,] mesh_indices;
 
@@ -56,6 +74,7 @@ public class ControllerScript : MonoBehaviour {
 
     void Awake()
     {
+       
 
         trackedObj = GetComponent<SteamVR_TrackedObject>();
    
@@ -99,6 +118,8 @@ public class ControllerScript : MonoBehaviour {
 
 	void Update() {
 
+        
+
         if (Controller.GetPressUp(SteamVR_Controller.ButtonMask.ApplicationMenu))
         {
             if (!MeshDeformation.experiment_running)
@@ -111,6 +132,9 @@ public class ControllerScript : MonoBehaviour {
                 {
                     MeshDeformation script = meshScripts[i];
                     script.mesh_file_location = beams[mesh_indices[cur_mesh_index, i]];
+                    script.emb_mesh_file_location = beams[beams.Length - 1];
+                    script.ms_delay = ms_delays[mesh_indices[cur_mesh_index, i]];
+                    script.YM_factor = YM_factors[mesh_indices[cur_mesh_index, i]];
                     script.myStart();
                 }
                 MeshDeformation.experiment_running = true;
@@ -134,8 +158,9 @@ public class ControllerScript : MonoBehaviour {
     {
         int betterBar = i;
         int worseBar = (i + 1) % 2;
-
-        output.Add("Better: " + mesh_indices[cur_mesh_index, betterBar] + " Worse: " + mesh_indices[cur_mesh_index, worseBar]);
+        double betterBarFramerate = meshScripts[betterBar].avgFrameRate;
+        double worseBarFramerate = meshScripts[worseBar].avgFrameRate;
+        output.Add("Better: " + mesh_indices[cur_mesh_index, betterBar] + " " + betterBarFramerate + " Worse: " + mesh_indices[cur_mesh_index, worseBar] + " " + worseBarFramerate);
     }
 
     void resetObjects()
@@ -161,42 +186,46 @@ public class ControllerScript : MonoBehaviour {
         {
             MeshDeformation script = meshScripts[i];
             script.mesh_file_location = beams[mesh_indices[cur_mesh_index, i]];
+            script.ms_delay = ms_delays[mesh_indices[cur_mesh_index, i]];
+            script.YM_factor = YM_factors[mesh_indices[cur_mesh_index, i]];
             script.reset_timestamp = DateTime.Now.Ticks / TimeSpan.TicksPerMillisecond;
             script.reset_object_pending = true; // Need to do this so we don't reset the object while the thread is running
         }
+        //SteamVR_Fade.View(Color.white, 1000f);
+        //SteamVR_Skybox.SetOverride();
     }
 
-	/* -------- Trigger Functions -------- */
-		
-	//public void OnTriggerEnter(Collider other)
-	//{
- //       if (holding == false)
- //       {
- //           SetCollidingObject(other);
- //       }
-	//}
-		
-	//public void OnTriggerExit(Collider other)
-	//{
-	//	if (!collidingObject)
-	//	{
-	//		return;
-	//	}
+    /* -------- Trigger Functions -------- */
 
- //       if (holding == false)
- //       {
- //           collidingObject = null;
- //       }
-	//}
+    public void OnTriggerEnter(Collider other)
+    {
+        if (holding == false)
+        {
+            SetCollidingObject(other);
+        }
+    }
 
-	///* -------- Helpers --------- */
+    public void OnTriggerExit(Collider other)
+    {
+        if (!collidingObject)
+        {
+            return;
+        }
 
-	//private void SetCollidingObject(Collider col)
-	//{
- //       if (collidingObject || !col.GetComponent<Rigidbody>())
-	//	{
-	//		return;
-	//	}
-	//	collidingObject = col.gameObject; 
-	//}
+        if (holding == false)
+        {
+            collidingObject = null;
+        }
+    }
+
+    /* -------- Helpers --------- */
+
+    private void SetCollidingObject(Collider col)
+    {
+        if (collidingObject || !col.GetComponent<Rigidbody>())
+        {
+            return;
+        }
+        collidingObject = col.gameObject;
+    }
 }

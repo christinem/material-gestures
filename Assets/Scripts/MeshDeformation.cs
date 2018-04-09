@@ -7,15 +7,17 @@ using System.Threading;
 using UnityEngine;
 
 
+
+
 public class MeshDeformation : MonoBehaviour {
     // DLL Imports
-    [DllImport("C:\\Users\\cmurad\\Documents\\GAUSS\\build\\x64\\Release\\GAUSSDLL.dll")]
-    public static extern IntPtr CreateMyObjectInstance(double grabbing_spring_stiffness, double spring_root_mass, double density, double youngsModulus, double poissonsRatio, double timestep, string mesh_path);
-    [DllImport("C:\\Users\\cmurad\\Documents\\GAUSS\\build\\x64\\Release\\GAUSSDLL.dll")]
+    [DllImport("C:\\Users\\cmurad\\Documents\\GAUSS\\build\\x64\\Release\\GaussDLL.dll")]
+    public static extern IntPtr CreateMyObjectInstance(double grabbing_spring_stiffness, double spring_root_mass, double density, double youngsModulus, double poissonsRatio, double timestep, string mesh_path, string emb_mesh_path);
+    [DllImport("C:\\Users\\cmurad\\Documents\\GAUSS\\build\\x64\\Release\\GaussDLL.dll")]
     public static extern int increment(IntPtr gaussObject, bool grabbed, int index, double x, double y, double z);
-    [DllImport("C:\\Users\\cmurad\\Documents\\GAUSS\\build\\x64\\Release\\GAUSSDLL.dll")]
+    [DllImport("C:\\Users\\cmurad\\Documents\\GAUSS\\build\\x64\\Release\\GaussDLL.dll")]
     public static extern void get_mesh_sizes(IntPtr gaussObject, ref int n_face_indices, ref int n_vertices);
-    [DllImport("C:\\Users\\cmurad\\Documents\\GAUSS\\build\\x64\\Release\\GAUSSDLL.dll")]
+    [DllImport("C:\\Users\\cmurad\\Documents\\GAUSS\\build\\x64\\Release\\GaussDLL.dll")]
     public static extern void get_updated_mesh(IntPtr gaussObject, double[] verts_flat, int[] face_indices_flat);
 
     //Instances of all MeshDeformations. Used for logging purposes
@@ -23,7 +25,7 @@ public class MeshDeformation : MonoBehaviour {
 
     // My Parameters
     double minSelectionDist = 0.15; // Chosen through experiment
-    double grabbing_spring_stiffness = 200.0;
+    double grabbing_spring_stiffness = 350.0;
     double spring_root_mass = 100000000.0;
     double timestep = 0.05;
     double density = 1000.0;
@@ -58,6 +60,8 @@ public class MeshDeformation : MonoBehaviour {
     public bool meshThreadFinished;
     public bool reset_object_pending;
     public long reset_timestamp = 0;
+    public double avgFrameRate = 0.0;
+
     Thread meshThread;
     Vector3[] threadMeshVertices;
     IntPtr gaussObject;
@@ -65,8 +69,27 @@ public class MeshDeformation : MonoBehaviour {
     int[] face_indices_flat;
 
     public string mesh_file_location = "";//passed into readMesh to read in the correct file for this instance
+    public string emb_mesh_file_location = "";
+    public int ms_delay = 0;
+    public double YM_factor = 1.0;
 
-    
+    long totalTime = 0;
+    int frameCount = 1;
+
+    public void MySleep(int milliseconds)
+    {
+        var stopwatch = new System.Diagnostics.Stopwatch();
+        stopwatch.Start();
+
+        while (stopwatch.ElapsedMilliseconds < milliseconds)
+        {
+            int timeout = milliseconds - (int)stopwatch.ElapsedMilliseconds;
+            Thread.Sleep(timeout >= 0 ? timeout : 0);
+        }
+
+        stopwatch.Stop();
+    }
+
     void meshThreadWork()
     {
         while(!meshThreadFinished)
@@ -78,7 +101,10 @@ public class MeshDeformation : MonoBehaviour {
                 Vector3 localControllerPos = state.pos; // This is the controller position in object space (transformed into gauss coordinate frame)
 
                 // This call does the actual simulation timestep
+                var stopwatch = new System.Diagnostics.Stopwatch();
+                stopwatch.Start();
                 increment(gaussObject, state.isGrabbing, state.grabbedVertIndex, (double)localControllerPos.x, (double)localControllerPos.y, (double)localControllerPos.z);
+                MySleep(ms_delay);
 
                 // Now update the mesh with the new one
                 get_updated_mesh(gaussObject, verts_flat, face_indices_flat);
@@ -86,6 +112,10 @@ public class MeshDeformation : MonoBehaviour {
                 {
                     threadMeshVertices[i] = new Vector3((float)verts_flat[i * 3], (float)verts_flat[i * 3 + 1], (float)verts_flat[i * 3 + 2]);
                 }
+
+                totalTime += stopwatch.ElapsedMilliseconds;
+                avgFrameRate = ((double)totalTime) / (double)frameCount;
+                frameCount++;
 
                 meshThreadRunning = false;
                 meshThread.Suspend();
@@ -120,13 +150,14 @@ public class MeshDeformation : MonoBehaviour {
 
     //Added this to reset the object when user has clicked the menu button.
     public void ObjectReset() {
-        //KillThread(); //Separated
+        totalTime = 0;
+        frameCount = 1;
 
         //----------------------
         //Straight copy pasted from start() function.
         //without recreating any global variables.
         Debug.Log("Loading " + mesh_file_location);
-        gaussObject = CreateMyObjectInstance(grabbing_spring_stiffness, spring_root_mass, density, youngsModulus, poissonsRatio, timestep, mesh_file_location);
+        gaussObject = CreateMyObjectInstance(grabbing_spring_stiffness, spring_root_mass, density, youngsModulus * YM_factor, poissonsRatio, timestep, mesh_file_location, emb_mesh_file_location);
         int n_face_indices = 0;
         int flat_verts_len = 0;
         get_mesh_sizes(gaussObject, ref n_face_indices, ref flat_verts_len);
@@ -142,14 +173,16 @@ public class MeshDeformation : MonoBehaviour {
         // Need to change order of indices for triangle normals to be computed correctly
         for (int i = 0; i < face_indices_flat.Length / 3; i++)
         {
-            int i0 = face_indices_flat[i * 3];
+            int i1 = face_indices_flat[i * 3 + 1];
             int i2 = face_indices_flat[i * 3 + 2];
-            face_indices_flat[i * 3] = i2;
-            face_indices_flat[i * 3 + 2] = i0;
+            face_indices_flat[i * 3 + 1] = i2;
+            face_indices_flat[i * 3 + 2] = i1;
         }
+
         mesh.SetTriangles(new int[0], 0);
         mesh.vertices = newVerts;
         mesh.SetTriangles(face_indices_flat, 0);
+        
         //mesh.vertices = new Vector3[0];
 
         
@@ -184,11 +217,12 @@ public class MeshDeformation : MonoBehaviour {
         // Set up the simulation
         // This is where you set the path to the bar
         Debug.Log("Loading " + mesh_file_location);
-        gaussObject = CreateMyObjectInstance(grabbing_spring_stiffness, spring_root_mass, density, youngsModulus, poissonsRatio, timestep, mesh_file_location); 
+        gaussObject = CreateMyObjectInstance(grabbing_spring_stiffness, spring_root_mass, density, youngsModulus * YM_factor, poissonsRatio, timestep, mesh_file_location, emb_mesh_file_location); 
 
         int n_face_indices = 0;
         int flat_verts_len = 0;
         get_mesh_sizes(gaussObject, ref n_face_indices, ref flat_verts_len);
+        //totally_useless(gaussObject);
 
         verts_flat = new double[flat_verts_len];
         face_indices_flat = new int[n_face_indices];
@@ -202,13 +236,18 @@ public class MeshDeformation : MonoBehaviour {
         }
 
         // Need to change order of indices for triangle normals to be computed correctly
-        for (int i = 0; i < face_indices_flat.Length/3; i++)
+        for (int i = 0; i < face_indices_flat.Length / 3; i++)
         {
-            int i0 = face_indices_flat[i * 3];
-            int i2 = face_indices_flat[i * 3+2];
-            face_indices_flat[i * 3] = i2;
-            face_indices_flat[i * 3 + 2] = i0;
+            int i1 = face_indices_flat[i * 3+1];
+            int i2 = face_indices_flat[i * 3 + 2];
+            face_indices_flat[i * 3+1] = i2;
+            face_indices_flat[i * 3 + 2] = i1;
         }
+
+
+        Debug.Log("verts: " + flat_verts_len);
+        Debug.Log("face: " + n_face_indices);
+
         mesh.SetTriangles(new int [0], 0);
         mesh.vertices = newVerts;
         mesh.SetTriangles(face_indices_flat, 0);
@@ -291,6 +330,14 @@ public class MeshDeformation : MonoBehaviour {
 
     // Update is called once per frame
     void Update() {
+        //if (!experiment_running)
+        //{
+        //    mesh_file_location = "C:\\Users\\cmurad\\Documents\\final_beams\\0_.mesh";
+        //    emb_mesh_file_location = "C:\\Users\\cmurad\\Documents\\final_beams\\4_.mesh";
+        //    myStart();
+        //    experiment_running = true;
+        //    return;
+        //}
         if (experiment_running)
         {
             updateControllers();
@@ -313,7 +360,7 @@ public class MeshDeformation : MonoBehaviour {
                 else
                 {
                  
-                    if (float.IsNaN(threadMeshVertices[0].x))
+                    if (float.IsNaN(threadMeshVertices[0].x) || Math.Abs(threadMeshVertices[0].x) > 100.0)
                     {
                         reset_object_pending = true;
                         return;
